@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Terminal Battle: Gojo vs Rimuru</title>
+    <style>
+        :root {
+            --term-green: #0f0;
+            --term-dark: #001100;
+            --glitch-red: #ff003c;
+            --bg-color: #000;
+            --font-main: 'Courier New', Courier, monospace;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--term-green);
+            font-family: var(--font-main);
+            height: 100dvh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* CRT 掃描線濾鏡 */
+        .crt-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 6px 100%;
+        }
+
+        ::-webkit-scrollbar { display: none; }
+
+        /* --- 前言故事區 --- */
+        #prologue {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: var(--bg-color);
+            z-index: 1000;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .prologue-img {
+            width: 150px;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 10px;
+            opacity: 0;
+            transition: opacity 1s, filter 1s;
+            margin-bottom: 20px;
+        }
+
+        #prologue-text {
+            font-size: 1.2rem;
+            min-height: 100px;
+            white-space: pre-wrap;
+        }
+
+        /* --- 遊戲主介面 --- */
+        #game-ui {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        #battle-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 2px dashed var(--term-green);
+            position: relative;
+        }
+
+        .entity {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 300px;
+        }
+
+        @media (min-width: 768px) {
+            #battle-area { flex-direction: row; }
+            #entity-boss { order: 2; }
+            #entity-player { order: 1; }
+        }
+
+        #entity-boss { order: 1; }
+        #entity-player { order: 2; }
+
+        .sprite-container {
+            width: 120px;
+            height: 120px;
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        .sprite {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            animation-fill-mode: forwards;
+        }
+
+        #player-img {
+            transform: scaleX(-1);
+            filter: drop-shadow(0 0 8px var(--term-green));
+        }
+
+        #boss-img {
+            filter: drop-shadow(0 0 15px var(--glitch-red));
+        }
+
+        .hp-container {
+            width: 100%;
+            background: #222;
+            border: 1px solid var(--term-green);
+            height: 15px;
+            margin-top: 5px;
+            position: relative;
+        }
+
+        .hp-bar {
+            height: 100%;
+            background: var(--term-green);
+            width: 100%;
+            transition: width 0.3s ease-out, background-color 0.3s;
+        }
+
+        .entity-info {
+            font-size: 0.9rem;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #terminal-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--term-dark);
+            padding: 10px;
+        }
+
+        #controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+
+        button {
+            background: transparent;
+            color: var(--term-green);
+            border: 1px solid var(--term-green);
+            padding: 15px 5px;
+            font-family: var(--font-main);
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--term-green);
+            color: var(--bg-color);
+        }
+
+        button:disabled {
+            border-color: #555;
+            color: #555;
+            cursor: not-allowed;
+        }
+
+        #log-area {
+            flex-grow: 1;
+            overflow-y: auto;
+            border-top: 1px solid #333;
+            padding-top: 10px;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .log-entry { margin-bottom: 5px; }
+        .log-sys { color: #aaa; }
+        .log-dmg { color: var(--glitch-red); }
+        .log-heal { color: #00ffff; }
+
+        /* 動畫區 */
+        @keyframes dash-pc-right { 0% { transform: scaleX(-1) translateX(0); } 50% { transform: scaleX(-1) translateX(-50px) scale(1.2); } 100% { transform: scaleX(-1) translateX(0); } }
+        @keyframes dash-pc-left { 0% { transform: translateX(0); } 50% { transform: translateX(-50px) scale(1.2); } 100% { transform: translateX(0); } }
+        @keyframes dash-mobile-up { 0% { transform: scaleX(-1) translateY(0); } 50% { transform: scaleX(-1) translateY(-50px) scale(1.2); } 100% { transform: scaleX(-1) translateY(0); } }
+        @keyframes dash-mobile-down { 0% { transform: translateY(0); } 50% { transform: translateY(50px) scale(1.2); } 100% { transform: translateY(0); } }
+
+        @keyframes glitch-hit {
+            0% { transform: translate(0); filter: none; }
+            20% { transform: translate(-10px, 5px) skewX(20deg); filter: invert(1) hue-rotate(90deg) brightness(2); }
+            40% { transform: translate(10px, -5px) skewX(-20deg); filter: invert(0) hue-rotate(180deg) brightness(0.5); }
+            60% { transform: translate(-5px, 10px) skewY(10deg); filter: invert(1) brightness(3); }
+            80% { transform: translate(5px, -10px) skewY(-10deg); filter: none; }
+            100% { transform: translate(0); filter: none; }
+        }
+
+        @keyframes death-drop {
+            0% { transform: translateY(0); filter: grayscale(0); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(45deg); filter: grayscale(1); opacity: 0; }
+        }
+
+        .anim-glitch { animation: glitch-hit 0.4s ease-in-out; }
+        .anim-death { animation: death-drop 1.5s forwards ease-in; }
+
+        @media (min-width: 768px) {
+            .anim-dash-player { animation: dash-pc-right 0.3s ease-in-out; }
+            .anim-dash-boss { animation: dash-pc-left 0.3s ease-in-out; }
+        }
+        @media (max-width: 767px) {
+            .anim-dash-player { animation: dash-mobile-up 0.3s ease-in-out; }
+            .anim-dash-boss { animation: dash-mobile-down 0.3s ease-in-out; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="crt-overlay"></div>
+
+    <div id="prologue">
+        <img id="prologue-img" class="prologue-img" src="" alt="Prologue Image">
+        <div id="prologue-text"></div>
+    </div>
+
+    <div id="game-ui">
+        <div id="battle-area">
+            <div id="entity-boss" class="entity">
+                <div class="sprite-container">
+                    <img id="boss-img" class="sprite" src="https://raw.githubusercontent.com/hzy0213/2d/main/%E4%B8%8B%E8%BC%89%20(1).png" alt="Rimuru">
+                </div>
+                <div class="entity-info">
+                    <span>UNKNOWN_PROCESS</span>
+                    <span id="boss-hp-text">10000/10000</span>
+                </div>
+                <div class="hp-container">
+                    <div id="boss-hp-bar" class="hp-bar"></div>
+                </div>
+                <div id="boss-status" style="color: #fff000; font-size: 0.8rem; margin-top: 5px; height: 15px;"></div>
+            </div>
+
+            <div id="entity-player" class="entity">
+                <div class="sprite-container">
+                    <img id="player-img" class="sprite" src="https://raw.githubusercontent.com/hzy0213/2d/main/%E4%B8%8B%E8%BC%89.png" alt="Gojo">
+                </div>
+                <div class="entity-info">
+                    <span>root@gojo:~#</span>
+                    <span id="player-hp-text">150/150</span>
+                </div>
+                <div class="hp-container">
+                    <div id="player-hp-bar" class="hp-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="terminal-area">
+            <div id="controls">
+                <button id="btn-attack" onclick="playerAction('attack')">std::attack()</button>
+                <button id="btn-rm" onclick="playerAction('rm')">sudo rm -rf /<br>(CD: 0)</button>
+                <button id="btn-ctrlc" onclick="playerAction('ctrlc')">Ctrl+C (中斷)<br>(CD: 0)</button>
+                <button id="btn-heal" onclick="playerAction('heal')">debug_heal()</button>
+            </div>
+            <div id="log-area">
+                <div class="log-entry log-sys">Connection established. Encountered malicious entity.</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
